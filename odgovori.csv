@@ -1,0 +1,40 @@
+kljuc,vrednost
+# ============================================================================
+# ODGOVORI - popunjava STUDENT
+#
+# Uputstvo:
+#   1. Kopirajte ovaj fajl u svoj folder za predaju i nazovite ga
+#      odgovori.csv
+#   2. U kolonu "vrednost" upisite broj koji ste DOBILI, ne onaj koji
+#      mislite da se ocekuje. Ako ste pogresili, mentor ce vam reci gde.
+#   3. Sta jos niste uradili - ostavite prazno ili upisite ?
+#   4. Decimale mozete pisati sa tackom (12.45) ili zarezom (12,45).
+#      Hiljade mozete pisati sa zarezom (776,579) ili bez (776579).
+#   5. NE menjajte kolonu "kljuc" i NE brisite redove.
+# ============================================================================
+#
+# --- DAN 1: ciscenje podataka ---
+dan1_redova_posle_ciscenja,
+dan1_broj_kupaca,
+dan1_ukupan_prihod,
+dan1_uklonjeno_duplikata,
+#
+# --- DAN 2: istrazivacka analiza ---
+dan2_udeo_uk_procenat,
+dan2_medijana_totalprice,
+dan2_najjaci_mesec,
+#
+# --- DAN 3: proizvodi i RFM (format meseca: 2010-11) ---
+dan3_medijana_recency,
+dan3_medijana_frequency,
+dan3_pareto_procenat,
+dan3_sampioni_udeo_prihoda,
+#
+# --- DAN 4: segmentacija (K-Means) ---
+dan4_broj_klastera,
+#
+# --- DAN 5: predikcija (format datuma: 2011-09-10) ---
+dan5_datum_preseka,
+dan5_udeo_vratili_procenat,
+dan5_tacnost_osnovne_linije,
+dan5_auc_najboljeg_modela,
