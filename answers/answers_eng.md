@@ -135,3 +135,86 @@ No, this is not a data error. Saturday is an operational non-working day for the
 The day-by-hour revenue heatmap indicates that transaction activity is strictly concentrated during standard workdays (Monday through Friday) between 09:00 and 16:00, with peak activity between 11:00 and 14:00. Prior to 08:00 and after 17:00, sales volume drops sharply, while evening and nighttime hours are virtually inactive.
 2. B2C consumers vs. B2B businesses:
 This purchasing timeline strongly indicates that customers are commercial businesses (B2B buyers, retail shop owners, and corporate procurement staff). Individual retail consumers (B2C) typically browse and purchase during leisure hours—specifically in the evenings (18:00–23:00) and over weekends. Because over 95% of transaction volume occurs strictly during regular business working hours on weekdays, combined with large unit order quantities, the customer base is unequivocally dominated by commercial B2B clients.
+
+---
+
+# Day 3 Question Answers — Products and RFM Analysis
+
+The answers below are derived directly from the code, execution outputs, and segmentation results in notebooks/03_rfm.ipynb and the accompanying assignment documentation.
+
+
+## 1. Best-Selling Products (Task 3.1)
+
+### Question 3.1: How many products appear on both lists (by quantity and by revenue)? What does this mean?
+Exactly 5 products appear on both top 10 lists (by total quantity sold and by total revenue generated):
+1. WHITE HANGING HEART T-LIGHT HOLDER (StockCode 85123A) — 247,048.01 £ revenue (#2), 91,757 units (#2), 1,490 customers
+2. PAPER CRAFT , LITTLE BIRDIE (StockCode 23843) — 168,469.60 £ revenue (#3), 80,995 units (#3), 1 customer
+3. JUMBO BAG RED RETROSPOT (StockCode 85099B) — 134,307.44 £ revenue (#4), 74,224 units (#6), 860 customers
+4. ASSORTED COLOUR BIRD ORNAMENT (StockCode 84879) — 124,351.86 £ revenue (#5), 78,234 units (#4), 1,010 customers
+5. MEDIUM CERAMIC TOP STORAGE JAR (StockCode 23166) — 81,416.73 £ revenue (#7), 77,916 units (#5), 138 customers
+
+What this means:
+These 5 products represent the core commercial pillars ("star products") of the company. They achieve a rare synergy: massive, recurring customer demand combined with healthy unit economics capable of generating immense cash flow. In contrast, products appearing solely on the quantity list (such as WORLD WAR 2 GLIDERS with over 105,000 units sold but only ~24,000 £ in revenue) are low-margin, high-volume impulse add-ons, while products appearing solely on the revenue list (such as REGENCY CAKESTAND 3 TIER with ~277,656 £) are higher-ticket premium items sold in moderate volumes.
+
+
+## 2. Pareto Analysis (Task 3.2)
+
+### Question 3.2: What percentage of the catalog generates 80% of revenue? Does the 80/20 rule hold?
+1. Catalog percentage generating 80% of revenue:
+Exactly 1,146 products, representing 21.7% (~22%) of the total product assortment (grouped by StockCode + Description), generate 80% of total revenue.
+2. Does the 80/20 rule hold:
+Yes, the Pareto principle (80/20 rule) holds remarkably well: approximately 22% of catalog items account for 80% of company revenue. This demonstrates extreme revenue concentration within the top quintile of catalog SKUs, while the remaining ~78% forms a long tail that contributes only 20% of revenue. For supply chain operations, inventory management and supplier negotiations must prioritize this essential 22%.
+
+
+## 3. Final Day 3 Questions (Notebook Questions)
+
+### Question 3.1: Why do the "top by quantity" and "top by revenue" lists differ so much?
+The two lists diverge due to substantial variation in unit prices across catalog categories:
+- Top products by quantity consist of low-priced novelty and craft items (such as miniature glider planes or paper baking cups) selling for pennies to around one pound. Although they move in massive physical volume, their aggregate monetary contribution is relatively small.
+- Top products by revenue are dominated by higher-value items (such as the tiered cake stand REGENCY CAKESTAND 3 TIER priced at £10–£12). Selling fewer units of a higher-priced item yields significantly higher revenue than selling tens of thousands of inexpensive accessories.
+
+### Question 3.2: Grouping by StockCode yields ~4,620 products, while grouping by StockCode + Description yields ~5,274. Where does the difference come from? What does this mean for the reliability of product descriptions and which key would you use?
+1. Source of the discrepancy:
+The difference arises because 598 distinct product codes (`StockCode`) have multiple text descriptions (`Description`) recorded across the two-year period. This happens due to:
+- Typographical errors and spelling variations (e.g., SPUNGE vs. SPONGE, inconsistent punctuation, commas, or slashes).
+- Rebranding and seasonal product title updates (e.g., WHITE SPOTS vs. POLKADOT).
+- Inconsistent casing or ad-hoc abbreviation by warehouse operators during inventory entry.
+2. Reliability of product descriptions:
+The text `Description` is unreliable as an analytical identifier because it is prone to data entry errors and drifts over time.
+3. Which key to use:
+The canonical alphanumeric `StockCode` must always be used as the primary grouping key. When human-readable product names are required for dashboards or reports, the most recent or most frequent `Description` associated with that `StockCode` should be mapped as an attribute.
+
+### Question 3.3: One product in the top list has only 1 customer. Find it. Is that normal and what should be done with it in the analysis?
+1. Identification:
+The product is `PAPER CRAFT , LITTLE BIRDIE` (StockCode `23843`). It sold 80,995 units and generated 168,469.60 £ in revenue from a single customer (CustomerID `16446`) on a single invoice (`581483`) on December 9, 2011.
+2. Is it normal:
+No, this is an extreme commercial anomaly—most likely a custom institutional B2B contract, bespoke manufacturing order, or total warehouse clearance sale. It is highly atypical for the third-highest-grossing product in company history to be backed by a single purchase order.
+3. How to handle it in analysis:
+- In corporate financial reports of total realized revenue, the transaction must be retained as the funds were genuinely received.
+- In merchandising, catalog demand forecasting, and recommendation algorithms (Market Basket analysis), this product should be isolated or treated separately. Otherwise, algorithms would treat it as a top-selling retail hit with broad consumer demand, leading to disastrous over-stocking and distorted cross-selling rules.
+
+### Question 3.4: Median spending is ~856, and mean is ~2,917. Explain the difference.
+In the RFM dataset covering 5,852 customers, median Monetary spend is 856.02 £, while the arithmetic mean is 2,916.71 £ (the mean is 3.4 times higher than the median).
+
+This gap is caused by severe positive skewness (power-law distribution) in customer spending:
+- Half of all customers (50%) spend less than 856 £ across the entire two-year timeframe.
+- Conversely, a tiny elite of high-volume wholesale buyers and distributors spend hundreds of thousands of pounds (the top customer spent over 580,000 £). These extreme high-value outliers pull the arithmetic mean sharply upward.
+The median represents what an ordinary customer spends, while the mean represents total corporate turnover divided by customer count and does not describe any typical customer.
+
+### Question 3.5: Which segment has the most customers? Which generates the most money? Is it the same segment? What does that difference mean for the marketing budget?
+1. Segment distribution:
+- Segment with the most customers: `Lost` with 1,510 customers (25.8% of the entire customer base). The second largest is `Loyal Customers` with 1,151 customers (19.7%).
+- Segment generating the most revenue: `Champions` with 8,781,126.40 £ (51.4% of total company revenue). The second highest is `Loyal Customers` with 4,658,851.80 £ (27.3%).
+2. Are they the same segment:
+No, they are polar opposites. The `Lost` cohort contains over a quarter of all customers (25.8%) but delivers merely 3.6% of revenue. In contrast, `Champions` represent only 14.2% of customer accounts (830 clients) yet generate over half of all corporate revenue.
+3. Marketing budget implications:
+The marketing budget must be allocated asymmetrically based on Return on Investment (ROI):
+- The lion's share of retention budget (dedicated account managers, priority fulfillment, VIP terms, exclusive volume rebates) must be dedicated to safeguarding and nurturing `Champions` and `Loyal Customers`. Together, these cohorts represent ~34% of clients but produce nearly 79% of total revenue. Losing even a handful of Champions inflicts immediate, severe revenue losses.
+- Allocating expensive marketing spend to broad win-back campaigns across all 1,510 lost customers yields poor ROI. The `Lost` cohort should be engaged via low-cost automated email sequences, while high-touch outreach is concentrated strictly on high-value accounts at risk (`Cannot Lose Them` and `At Risk`).
+
+### Question 3.6: For the segment "Cannot Lose Them" — describe the typical customer and propose one concrete action.
+1. Profile of the typical customer:
+The `Cannot Lose Them` segment comprises 72 high-value clients (1.2% of customer accounts) who historically generated over half a million pounds (503,405.10 £, or 2.9% of revenue), averaging nearly 7,000 £ per customer.
+Profile: These customers exhibit the highest historical Frequency and Monetary scores (F=5, high M), meaning they were once among the firm's most frequent and profitable commercial buyers. However, their Recency score has plummeted to 1 or 2—they have not placed an order in many months. They have either encountered service friction, altered their procurement, or defected to a competitor.
+2. Proposed concrete action:
+Do not send generic automated coupons or marketing newsletters. Initiate direct, personal executive outreach led by a Senior Account Executive or Sales Director (via telephone or face-to-face visit). Conduct a relationship review: identify the root cause of lapsed orders (logistics delays, damaged goods, pricing pressure, competitor poaching), offer tailored remedies (e.g., custom volume pricing, dedicated customer service, or extended payment terms), and secure a renewed supply contract.

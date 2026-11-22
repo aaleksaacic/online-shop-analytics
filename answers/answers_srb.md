@@ -135,3 +135,86 @@ Nije u pitanju greška u podacima. Subota je zvanično neradni dan za operativne
 Heatmapa transakcija po danima i satima pokazuje izrazitu koncentraciju kupovina radnim danima (od ponedeljka do petka) u intervalu između 09:00 i 16:00 časova, sa izrazitim vrhom aktivnosti između 11:00 i 14:00 časova. Pre 08:00 časova ujutru i nakon 17:00 časova popodne promet je zanemarljiv, dok su večernji i noćni sati potpuno prazni.
 2. Šta to govori o profilu kupaca (fizička lica ili firme):
 Ovakav vremenski obrazac jasno potvrđuje da su dominantni kupci pravna lica (firme, prodavnice, preduzetnici — B2B segment). Fizička lica (B2C) u elektronskoj trgovini kupuju dominantno u slobodno vreme — uveče (od 18:00 do 23:00) i tokom vikenda. Činjenica da se preko 95% kupovina obavlja isključivo unutar standardnog radnog vremena radnim danima, zajedno sa velikim količinama artikala po narudžbini, nedvosmisleno ukazuje na to da zaposleni u preduzećima naručuju robu tokom svog radnog vremena.
+
+---
+
+# Odgovori na pitanja za Dan 3 — Proizvodi i RFM analiza
+
+Odgovori su formulisani na osnovu koda, izlaza i rezultata segmentacije iz sveske notebooks/03_rfm.ipynb i prateće dokumentacije zadatka.
+
+
+## 1. Najprodavaniji proizvodi (Zadatak 3.1)
+
+### Pitanje 3.1: Koliko se proizvoda pojavljuje na obe liste (po količini i po prihodu)? Šta to znači?
+Na obe top 10 liste (po ukupnoj prodatoj količini i po ukupno ostvarenom prihodu) pojavljuje se tačno 5 proizvoda:
+1. WHITE HANGING HEART T-LIGHT HOLDER (StockCode 85123A) — 247.048,01 £ prihoda (2. mesto), 91.757 komada (2. mesto), 1.490 kupaca
+2. PAPER CRAFT , LITTLE BIRDIE (StockCode 23843) — 168.469,60 £ prihoda (3. mesto), 80.995 komada (3. mesto), 1 kupac
+3. JUMBO BAG RED RETROSPOT (StockCode 85099B) — 134.307,44 £ prihoda (4. mesto), 74.224 komada (6. mesto), 860 kupaca
+4. ASSORTED COLOUR BIRD ORNAMENT (StockCode 84879) — 124.351,86 £ prihoda (5. mesto), 78.234 komada (4. mesto), 1.010 kupaca
+5. MEDIUM CERAMIC TOP STORAGE JAR (StockCode 23166) — 81.416,73 £ prihoda (7. mesto), 77.916 komada (5. mesto), 138 kupaca
+
+Šta to znači:
+Ovih 5 artikala predstavljaju apsolutne stubove asortimana („zvezde“ poslovanja). Oni uspevaju da ostvare redak balans: imaju izuzetno visoku i stabilnu potražnju u pogledu obima (količine), a istovremeno drže stabilnu jediničnu cenu koja generiše ogroman novčani priliv. Za razliku od njih, artikli koji su samo na listi količina (poput WORLD WAR 2 GLIDERS sa preko 105.000 komada, ali svega ~24.000 £ prihoda) predstavljaju jeftine impulsne proizvode sa niskom maržom, dok su artikli samo na listi prihoda (poput REGENCY CAKESTAND 3 TIER sa ~277.656 £) skuplji, premijum proizvodi sa umerenijim brojem prodatih jedinica.
+
+
+## 2. Pareto analiza (Zadatak 3.2)
+
+### Pitanje 3.2: Koliko procenata asortimana donosi 80% prihoda? Da li važi pravilo 80/20?
+1. Procenat asortimana za 80% prihoda:
+Tačno 1.146 proizvoda, što čini 21,7% ukupnog asortimana (posmatrano po parovima StockCode + Description), donosi 80% ukupnog prihoda kompanije.
+2. Da li važi pravilo 80/20:
+Da, Paretovo pravilo 80/20 važi u izuzetno preciznoj meri (~22% asortimana donosi 80% prihoda). To pokazuje visoku koncentraciju prihoda na gornjoj petini kataloga, dok preostalih ~78% asortimana čini takozvani „dugi rep“ (long tail) koji generiše svega 20% prihoda. Za menadžment ovo znači da fokus nabavke, skladišnog prostora i pregovora sa dobavljačima mora biti usmeren na ovu ključnu petinu artikala.
+
+
+## 3. Završna pitanja Dana 3 (Pitanja za notebook)
+
+### Pitanje 3.1: Zašto se liste „top po količini“ i „top po prihodu“ toliko razlikuju?
+Liste se razlikuju zbog velike varijacije u jediničnim cenama artikala:
+- Top lista po količini sadrži jeftine, sitne proizvode (poput maketa aviona WORLD WAR 2 GLIDERS ili papirnih korpica za kolače) koji koštaju svega nekoliko desetina penija ili oko jedne funte. Iako se prodaju u desetinama i stotinama hiljada komada, njihov finansijski doprinos je relativno skroman.
+- Top lista po prihodu predvođena je artiklima sa znatno višom jediničnom cenom (poput stalaka za torte REGENCY CAKESTAND 3 TIER sa cenom od 10–12 £). Manji broj prodatih komada skupljeg artikla generiše neuporedivo veći prihod nego ogroman broj sitnih impulsnih artikala.
+
+### Pitanje 3.2: Grupisanje po StockCode daje ~4.620 proizvoda, a po StockCode + Description ~5.274. Odakle razlika? Šta to znači za pouzdanost naziva proizvoda i koji biste ključ koristili?
+1. Odakle razlika:
+Razlika potiče od činjenice da za 598 šifara proizvoda (StockCode) postoji više različitih tekstualnih opisa (Description) unetih kroz vreme. Uzroci su:
+- Tipografske greške i slovne razlike (npr. SPUNGE umesto SPONGE, prisustvo ili odsustvo zareza, razmaka i kosih crta).
+- Promene marketinškog naziva istog proizvoda tokom posmatranog dvogodišnjeg perioda (npr. WHITE SPOTS u odnosu na POLKADOT).
+- Nekonzistentno pisanje velikih i malih slova ili skraćivanje naziva prilikom unosa novih serija u skladišni sistem.
+2. Šta to znači za pouzdanost naziva proizvoda:
+Tekstualni opis (Description) je operativno nepouzdan kao primarni identifikator artikla jer je podložan ljudskim greškama i promenama tokom vremena.
+3. Koji ključ koristiti:
+Kao jedinstveni ključ za analize i grupisanja obavezno treba koristiti šifru artikla (`StockCode`). Ukoliko je u izveštaju potreban čitljiv naziv, uzima se najnoviji ili najčešće korišćeni Description povezan sa tim konkretnim StockCode-om.
+
+### Pitanje 3.3: Jedan proizvod u top listi ima samo 1 kupca. Nađite ga. Da li je to normalno i šta bi trebalo uraditi sa njim u analizi?
+1. Koji je to proizvod:
+U pitanju je artikal `PAPER CRAFT , LITTLE BIRDIE` (StockCode `23843`). Prodat je u količini od 80.995 komada, doneo je prihod od 168.469,60 £, a kupio ga je samo jedan jedini kupac (CustomerID `16446`) na jednoj fakturi (`581483`) dana 09.12.2011.
+2. Da li je to normalno:
+Ne, to predstavlja ekstreman komercijalni izuzetak (anomaliju) — najverovatnije namenski veleprodajni ugovor, vanrednu korporativnu narudžbinu ili rasprodaju celokupne serije jednom kupcu. Nije uobičajeno da treći najvredniji proizvod u istoriji kompanije duguje celokupan promet jednoj jedinoj transakciji.
+3. Šta uraditi sa njim u analizi:
+- U finansijskim izveštajima o ukupnom prihodu kompanije transakciju treba zadržati jer novac jeste realno naplaćen.
+- U analizama asortimana, predviđanju tražnje i sistemima za preporuku artikala (Market Basket analizi), ovaj artikal treba izolovati ili posmatrati odvojeno. U suprotnom, on veštački stvara privid da je reč o stalnom masovnom hit-proizvodu sa redovnom tražnjom, što bi dovelo do pogrešnih odluka o nabavci i planiranju zaliha.
+
+### Pitanje 3.4: Medijana potrošnje je ~856, a prosek ~2.917. Objasnite razliku.
+U RFM tabeli za 5.852 kupca medijana potrošnje (Monetary) iznosi 856,02 £, dok je prosek (aritmetička sredina) 2.916,71 £ (prosek je čak 3,4 puta veći od medijane).
+
+Razlog ove razlike je ekstremna asimetrija distribucije potrošnje kupaca:
+- Polovina svih identifikovanih kupaca (50%) tokom celog dvogodišnjeg perioda ukupno potroši manje od 856 £.
+- S druge strane, mali broj velikih B2B veleprodajnih kupaca i distributera ostvaruje stotine hiljada funti prometa (najveći kupac ima zabeležen promet od preko 580.000 £). Ovi klijenti vuku aritmetički prosek visoko naviše.
+Medijana oslikava realnu potrošnju tipičnog kupca, dok je prosek samo zbir ukupnog prihoda podeljen brojem kupaca i ne opisuje prosečnog pojedinca.
+
+### Pitanje 3.5: Koji segment ima najviše kupaca? Koji donosi najviše novca? Da li je to isti segment? Šta ta razlika znači za marketinški budžet?
+1. Podaci o segmentima:
+- Segment sa najviše kupaca: `Lost` (Izgubljeni kupci) sa 1.510 kupaca, što čini 25,8% ukupne baze klijenata. Sledeći po veličini je `Loyal Customers` sa 1.151 kupcem (19,7%).
+- Segment koji donosi najviše novca: `Champions` (Šampioni) sa 8.781.126,40 £, što čini čak 51,4% ukupnog prihoda kompanije. Drugi po prihodu je `Loyal Customers` sa 4.658.851,80 £ (27,3%).
+2. Da li je to isti segment:
+Ne, to su potpuno različiti segmenti. Segment `Lost` obuhvata više od četvrtine baze klijenata (25,8%), ali generiše svega 3,6% prihoda. Sa druge strane, segment `Champions` obuhvata svega 14,2% baze (830 kupaca), a donosi preko polovine celokupnog prihoda.
+3. Šta ta razlika znači za marketinški budžet:
+Budžet se mora raspodeliti asimetrično na osnovu povrata investicije (ROI):
+- Primarni deo budžeta (kroz VIP programe, posvećene menadžere naloga, specijalne rabate i personalizovane uslove) mora biti usmeren na zadržavanje i nagrađivanje segmenata `Champions` i `Loyal Customers`. Ovi segmenti zajedno čine ~34% kupaca, ali generišu skoro 79% ukupnog prihoda preduzeća. Gubitak čak i nekoliko kupaca iz ovog segmenta predstavlja direktan udarac na opstanak poslovanja.
+- Trošenje skupih marketinških resursa na reaktivaciju masovnog segmenta `Lost` je neisplativo. Za njih treba primeniti jeftine, automatizovane mejling kampanje, dok se direktna i skuplja reaktivacija fokusira na vrednije klijente koji su u riziku (`Cannot Lose Them` i `At Risk`).
+
+### Pitanje 3.6: Za segment „Ne smemo ih izgubiti“ — opišite tipičnog kupca i predložite jednu konkretnu akciju.
+1. Opis tipičnog kupca:
+Segment `Cannot Lose Them` obuhvata 72 klijenta (1,2% baze) koji su istorijski generisali preko pola miliona funti (503.405,10 £, odnosno 2,9% prihoda), sa prosečnom potrošnjom od blizu 7.000 £ po kupcu.
+Tipičan profil: To je klijent sa najvišom ocenom frekvencije i potrošnje (F=5, visoka monetarna vrednost), što znači da je u prošlosti bio među najboljim i najredovnijim kupcima kompanije. Međutim, njegova ocena svežine je najniža (R=1 ili 2) — nije naručio ništa mesecima. Ovaj kupac je na pragu potpunog odlaska ili je već počeo da sarađuje sa konkurentskim dobavljačem.
+2. Predlog konkretne akcije:
+Ne slati generičke automatizovane promotivne mejlove ili vaučere za popust. Neophodan je direktan kontakt od strane direktora prodaje ili ključnog menadžera naloga (telefonski poziv ili lični sastanak). Cilj razgovora je sprovođenje strukturiranog intervjua: utvrditi razlog prekida saradnje (da li je u pitanju nezadovoljstvo rokovima isporuke, kvalitetom, cenovnom politikom ili promena potreba), ponuditi rešavanje problema kroz prilagođene komercijalne uslove (npr. poseban količinski rabat ili odloženo plaćanje) i obnoviti ugovor o snabdevanju.
