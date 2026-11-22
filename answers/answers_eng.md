@@ -9,7 +9,7 @@ The answers below are derived directly from the code, execution outputs, and ana
 The raw dataset (after merging the two Excel sheets "Year 2009-2010" and "Year 2010-2011") contains a total of 1,067,371 rows and 8 original columns (or 9 columns if including the helper column "List" added to track the sheet of origin).
 - Sheet "Year 2009-2010": 525,461 rows
 - Sheet "Year 2010-2011": 541,910 rows
-- Total: 525,461 + 541,910 = 1,067,371 rows.
+Total: 525,461 + 541,910 = 1,067,371 rows.
 
 ### Question 1.2.2: Which columns have missing values and how many?
 In the raw data, missing values are present in two columns:
@@ -74,3 +74,64 @@ The distinction stems from differing analytical objectives:
 After isolating cancellation invoices (those prefixed with "C"), the step filtering Quantity <= 0 removed exactly 0 rows (0 rows with Quantity <= 0 remained).
 
 This result proves that all negative quantities in the original dataset stemmed exclusively from formal cancellations and merchandise returns. There were no hidden data-entry errors or untracked negative stock adjustments outside the standard cancellation workflow, confirming that the "C" invoice prefix serves as a complete and reliable indicator of all reversed transactions.
+
+---
+
+# Day 2 Question Answers — Exploratory Data Analysis (EDA)
+
+The answers below are derived directly from the code, execution outputs, and visualizations in notebooks/02_eda.ipynb and the accompanying assignment documentation.
+
+
+## 1. Top Values and Outliers (Task 2.2)
+
+### Question 2.2: Are the largest TotalPrice line items data errors or genuine purchases? How did you determine that? Should they be removed?
+Inspection of the top 10 items by TotalPrice (led by 168,469.60 £ for "PAPER CRAFT , LITTLE BIRDIE" and 77,183.60 £ for "MEDIUM CERAMIC TOP STORAGE JAR") shows:
+
+1. Data errors vs. genuine purchases:
+These records are genuine commercial B2B purchases (wholesale transactions), not technical errors or corrupted data.
+2. How we determined this:
+- The unit prices (UnitPrice) are completely ordinary, realistic catalog prices (e.g., 1.04 £, 1.66 £, 2.08 £, 2.10 £ per unit). The massive TotalPrice values result entirely from large bulk order quantities (Quantity ranging from 2,400 to 80,995 units).
+- Product descriptions correspond to standard, high-volume catalog merchandise (storage jars, seasonal decor, fairy cake flannels, tea/coffee tins, paper lanterns).
+- The customer IDs and invoice numbers represent valid, recurring commercial accounts. Several clients place repeated bulk orders (e.g., CustomerID 15749 ordered 3,114 units of the same item in both January and April 2011; CustomerID 15838 placed bulk seasonal candle-holder orders in October and November 2010; CustomerID 14646 in the Netherlands is an established major wholesale partner).
+3. Should they be removed:
+No, absolutely not. Deleting these transactions would be a severe analytical error. In wholesale retail, a small fraction of high-volume clients accounts for the majority of revenue. Removing them would effectively erase top customers and true corporate revenue. These extreme values should not be dropped; rather, statistical modeling should accommodate them using robust methods (such as log transformations or rank-based scaling).
+
+
+## 2. Final Day 2 Questions (Notebook Questions)
+
+### Question 2.1: Why is the mean of TotalPrice nearly double the median? Which of these two metrics would you report to an executive, and why?
+1. Why the mean and median diverge:
+In the dataset, the median TotalPrice is 12.45 £, whereas the arithmetic mean is 21.98 £ (the mean is 1.77 times the median). This divergence is driven by extreme positive skewness (right-skewed distribution). The vast majority of transaction rows consist of modest retail purchases (50% of items are priced below 12.45 £, and 75% are below 24.90 £). However, a small number of massive wholesale orders (ranging up to tens and hundreds of thousands of pounds) pull the arithmetic mean upward.
+2. Which metric to report to an executive and why:
+Both metrics should be included, but with clearly distinguished business roles:
+- The median (12.45 £) represents the "typical" purchase line item for an ordinary customer, as it is robust against extreme outliers and accurately reflects everyday order behavior.
+- The mean (21.98 £) is an aggregate financial indicator reflecting the average revenue generated per transaction line (Total Revenue = Total Rows * Mean).
+If an executive were presented solely with the mean of ~22 £, they would mistakenly assume that an ordinary transaction brings in that amount, when in reality over 70% of transactions fall below it. Consequently, the median must always be highlighted as the representative measure of customer transaction size, accompanied by the mean to capture overall financial yield.
+
+### Question 2.2: Ireland and the Netherlands rank high in revenue but have very few customers. Calculate the average basket per country. What can you deduce about the nature of these customers?
+Sales metrics by country indicate:
+- United Kingdom: 14,288,773.50 £ revenue (83.71%), 5,334 customers, 33,361 invoices, average basket (Revenue / Invoices) = 428.31 £.
+- EIRE (Ireland): 586,626.08 £ revenue (3.44%), 3 customers, 528 invoices, average basket = 1,111.03 £ (over 195,000 £ in revenue per customer).
+- Netherlands: 549,773.41 £ revenue (3.22%), 22 customers, 216 invoices, average basket = 2,545.25 £ (over 24,000 £ in revenue per customer).
+- Australia: 167,800.01 £ revenue (0.98%), 15 customers, 89 invoices, average basket = 1,885.39 £.
+
+Deductions about customer profiles:
+These accounts are large B2B wholesale partners and regional distributors, not individual retail consumers (B2C). In Ireland and the Netherlands, the business does not operate as a conventional e-commerce site serving thousands of small retail shoppers. Instead, it functions as a primary international supplier shipping bulk container-level merchandise to commercial trade partners and retail chains for local re-distribution.
+
+### Question 2.3: Is seasonality present? Does the pattern repeat across both years? Why is repetition across years essential for drawing conclusions?
+1. Presence and consistency of seasonality:
+Yes, pronounced and consistent seasonality is evident, repeating across both 2010 and 2011. In Q1 (particularly January and February), sales reach annual lows (e.g., February 2011 generated 442,294 £). Activity begins accelerating in late summer/autumn (September and October) and surges to a major annual peak in November (1,155,978 £ in November 2010 and 1,136,534 £ in November 2011).
+2. Why multi-year repetition is essential:
+If this surge had occurred only in a single year, it could easily be dismissed as a one-time anomaly, a temporary marketing campaign, or a macro-economic fluke. Observing the exact same seasonal trajectory across two consecutive years validates that this is a stable, recurring business cycle driven by retailers stocking up ahead of the Christmas shopping season. For management, this confirms that procurement, supply chain logistics, and warehouse staffing must be scaled up months in advance (August through October) to handle the November volume.
+
+### Question 2.4: What happens on Saturdays? Is this a data error?
+1. What happens on Saturdays:
+Saturday accounts for only 9,803.05 £ across the entire two-year dataset, representing just 0.057% (~0.06%) of total corporate revenue.
+2. Is it a data error:
+No, this is not a data error. Saturday is an operational non-working day for the company's fulfillment center, office, and warehouse facilities. The tiny volume recorded on Saturdays reflects occasional automated online orders logged by web servers or maintenance entries. The company operates on a Sunday-through-Friday commercial cycle (closing on Saturday and resuming dispatch on Sunday afternoon for Monday delivery), which is a common operating model in British distribution and wholesale logistics.
+
+### Question 2.5: Examine the heatmap. At what times of day do purchases occur? What does this suggest regarding whether customers are B2C consumers or B2B businesses?
+1. Purchasing hours:
+The day-by-hour revenue heatmap indicates that transaction activity is strictly concentrated during standard workdays (Monday through Friday) between 09:00 and 16:00, with peak activity between 11:00 and 14:00. Prior to 08:00 and after 17:00, sales volume drops sharply, while evening and nighttime hours are virtually inactive.
+2. B2C consumers vs. B2B businesses:
+This purchasing timeline strongly indicates that customers are commercial businesses (B2B buyers, retail shop owners, and corporate procurement staff). Individual retail consumers (B2C) typically browse and purchase during leisure hours—specifically in the evenings (18:00–23:00) and over weekends. Because over 95% of transaction volume occurs strictly during regular business working hours on weekdays, combined with large unit order quantities, the customer base is unequivocally dominated by commercial B2B clients.
