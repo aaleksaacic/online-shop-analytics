@@ -218,3 +218,159 @@ Segment `Cannot Lose Them` obuhvata 72 klijenta (1,2% baze) koji su istorijski g
 Tipičan profil: To je klijent sa najvišom ocenom frekvencije i potrošnje (F=5, visoka monetarna vrednost), što znači da je u prošlosti bio među najboljim i najredovnijim kupcima kompanije. Međutim, njegova ocena svežine je najniža (R=1 ili 2) — nije naručio ništa mesecima. Ovaj kupac je na pragu potpunog odlaska ili je već počeo da sarađuje sa konkurentskim dobavljačem.
 2. Predlog konkretne akcije:
 Ne slati generičke automatizovane promotivne mejlove ili vaučere za popust. Neophodan je direktan kontakt od strane direktora prodaje ili ključnog menadžera naloga (telefonski poziv ili lični sastanak). Cilj razgovora je sprovođenje strukturiranog intervjua: utvrditi razlog prekida saradnje (da li je u pitanju nezadovoljstvo rokovima isporuke, kvalitetom, cenovnom politikom ili promena potreba), ponuditi rešavanje problema kroz prilagođene komercijalne uslove (npr. poseban količinski rabat ili odloženo plaćanje) i obnoviti ugovor o snabdevanju.
+
+---
+
+# Odgovori na pitanja za Dan 4 — Segmentacija kupaca (K-Means)
+
+Odgovori u nastavku su izvedeni direktno iz programskog koda, izlaznih rezultata izvršavanja i modela klasterizacije u [04_kmeans.ipynb](notebooks/04_kmeans.ipynb) i prateće projektne dokumentacije.
+
+
+## 1. Priprema podataka (Zadatak 4.1)
+
+### Pitanje 4.1.1: Izračunajte skew() pre i posle log transformacije. Zašto su oba koraka obavezna? Šta bi se konkretno desilo sa klasterima da preskočite standardizaciju?
+
+#### 1. Vrednosti asimetrije (`skew`) pre i posle `np.log1p()`
+Koeficijenti asimetrije izmereni na uzorku od 5.852 kupca pre i posle primene logaritamske transformacije:
+
+| Varijabla (Feature) | Asimetrija pre log-a | Asimetrija posle log-a (`np.log1p`) | Efekat smanjenja asimetrije |
+|---|---|---|---|
+| **Recency** | 0,89 | -0,49 | Umerena pozitivna asimetrija pretvorena u približno simetričnu raspodelu |
+| **Frequency** | 12,04 | 1,00 | Izražena pozitivna asimetrija smanjena za 91,7% |
+| **Monetary** | 25,33 | 0,27 | Ekstremna eksponencijalna asimetrija smanjena za 98,9% (skoro savršena normalna simetrija) |
+
+#### 2. Zašto su oba koraka (log1p i StandardScaler) obavezna?
+Algoritam K-Means u osnovi funkcioniše računajući **Euklidsko rastojanje** u višedimenzionalnom prostoru:
+$$d(x, y) = \sqrt{\sum_{i=1}^n (x_i - y_i)^2}$$
+
+S obzirom na to da Euklidsko rastojanje podrazumeva sferični metrički prostor i pretpostavlja izotropnu raspodelu, podaci moraju zadovoljiti dva ključna preduslova:
+1. **Logaritamska transformacija (`np.log1p`):** Rešava problem ekstremne asimetrije i sabija raspon ekstremnih vrednosti (engl. *outliers*) koje se prostiru preko više redova veličine (npr. potrošnja od 3,75 £ pa sve do 580.000 £). Bez logaritmovanja, 95% većine kupaca sa manjom potrošnjom bilo bi sabijeno u jedan hiper-zgusnuti klaster, dok bi nekolicina ogromnih veleprodajnih kupaca formirala izolovane, beskorisne klastere od po jednog člana ili potpuno povukla centre klastera ka sebi. Log transformacija prevodi multiplikativne razlike u aditivne linearne skale.
+2. **Standardizacija (`StandardScaler`):** Skalira svaku varijablu tako da ima srednju vrednost $\mu = 0$ i standardnu devijaciju $\sigma = 1$. Čak i nakon logaritmovanja, rasponi i varijanse za Recency, Frequency i Monetary nisu identični. StandardScaler obezbeđuje da sve tri dimenzije ravnopravno učestvuju u računanju rastojanja.
+
+#### 3. Šta bi se konkretno desilo sa klasterima da se preskoči standardizacija?
+Ukoliko se izostavi `StandardScaler`, računanje Euklidskog rastojanja biva potpuno podređeno varijabli koja ima najveći numerički raspon i varijansu.
+- Na sirovim podacima, Monetary se meri desetinama i stotinama hiljada funti, dok se Frequency kreće od 1 do 300, a Recency od 0 do 738. U tom slučaju, rastojanje bi 99,9% zavisilo isključivo od novca, čime bi se K-Means pretvorio u jednodimenzionalno sečenje po potrošnji, a Frequency i Recency bi postali matematički nebitni.
+- Čak i kada se primeni `np.log1p` bez standardizacije, raspon log-Recency (od ~0 do 6,6) i log-Monetary (od ~1,5 do 13,3) ostaje veći od raspona log-Frequency (od ~0,69 do 5,7). Varijabla sa većim vrednostima stvara izdužene elipsoidne klastere, dok varijable sa manjim rasponom gube uticaj na formiranje granica segmenata.
+
+
+## 2. Određivanje broja klastera (Zadatak 4.2 / Pitanje 4.1)
+
+### Pitanje 4.1: Silueta kaže k=2, elbow kaže k=5. Koji biste izabrali i zašto?
+
+#### 1. Empirijski rezultati za $k \in [2, 10]$
+Rezultati evaluacije mera kompaktnosti i separacije klastera:
+
+| $k$ | Inercija (Elbow) | Silhouette Score | Poslovna interpretativnost |
+|---|---|---|---|
+| **k = 2** | 8.562,3 | **0,444** (Globalni maksimum) | Trivijalna binarna podela (Aktivni vs. Neaktivni); minimalna upotrebna vrednost |
+| **k = 3** | 6.338,4 | 0,351 | Preširoke grupe; spaja različite kategorije kupaca visoke vrednosti |
+| **k = 4** | 4.908,2 | 0,365 | Dobra matematička struktura, ali ne razdvaja nove/povremene od stalnih |
+| **k = 5** | **4.090,2** | **0,340** (Optimalni prelom lakta) | **Izabrani model: Visoko primenjiva strateška segmentacija baze** |
+| **k = 6** | 3.549,3 | 0,336 | Preterana fragmentacija lojalnih i pasivnih kupaca |
+| **k = 7** | 3.181,9 | 0,301 | Opadajući prinosi; koeficijent siluete znatno opada |
+| **k = 8** | 2.892,4 | 0,294 | Prenaučenost (overfitting); podgrupe nemaju jasne poslovne akcije |
+| **k = 9** | 2.650,1 | 0,285 | Nestabilni centroidi; teška interpretacija |
+| **k = 10** | 2.460,3 | 0,284 | Prevelika granulacija za operativno upravljanje |
+
+#### 2. Obrazloženje izbora: Zašto biramo $k = 5$?
+Za praktičnu primenu i donošenje poslovnih odluka biramo **$k = 5$** iz sledećih razloga:
+
+1. **Matematička priroda $k = 2$:** 
+   Silueta postiže maksimum na $k=2$ (0,444) jer baza ima prirodno snažnu polarnost između onih koji su kupovali skoro i onih koji su odavno prestali. Međutim, podela celokupne baze na samo dve grupe (npr. „Aktivni vs. Neaktivni“ ili „Veliki vs. Mali“) u praksi pruža zanemarljivu vrednost. Sa $k=2$ ne možemo razlikovati elitnog VIP kupca sa 50.000 £ od stabilnog redovnog kupca sa 2.000 £, niti možemo razlikovati kupca koji je tek počeo da se hladi od onog koji je trajno izgubljen pre više od godinu dana.
+2. **Prelom na krivi inercije (Elbow metod) na $k = 5$:** 
+   Kriva inercije pokazuje najjasniju tačku preloma (tzv. „lakat“) na $k=5$ (inercija pada sa 8.562 za $k=2$ na 4.090 za $k=5$, nakon čega se kriva značajno zaravnjava, a svaki sledeći klaster donosi minimalno smanjenje greške).
+3. **Akcionabilnost i poslovni povrat investicije:** 
+   Klasterizacija je prevashodno alat za poslovno odlučivanje, a ne puka teorijska vežba. $k=5$ pruža optimalan balans između matematičke validnosti (stabilna silueta od 0,340 uz homogene grupe) i operativne primene. Ovih 5 klastera omogućavaju kreiranje konkretnih, diferenciranih strategija: VIP tretman za najveće, programi lojalnosti za stabilne, podsticaj za povremene, brza reaktivacija za uspavane i smanjenje troškova za trajno neaktivne.
+
+
+## 3. Profili klastera i poslovna imena (Zadatak 4.3 / Pitanje 4.2)
+
+### Pitanje 4.2: Opišite svaki klaster u jednoj rečenici razumljivoj direktoru prodaje.
+
+Konačni K-Means model ($k=5$, random_state=42) kreirao je sledeću raspodelu na ukupno 5.852 kupca i 17.068.582,70 £ realizovanog prihoda:
+
+| Klaster | Poslovno ime | Broj kupaca | Udeo kupaca (%) | Prosečan Recency (dana) | Prosečan Frequency (porudžbina) | Prosečan Monetary (£) | Ukupan prihod (£) | Udeo u prihodu (%) |
+|---|---|---|---|---|---|---|---|---|
+| **0** | **VIP kupci** | 454 | 7,76% | 17,3 | 32,6 | 20.635,50 £ | 9.368.515,70 £ | **54,89%** |
+| **1** | **Lojalni kupci** | 1.284 | 21,94% | 48,8 | 9,1 | 3.627,24 £ | 4.657.379,30 £ | **27,29%** |
+| **2** | **Povremeni kupci** | 1.141 | 19,50% | 32,5 | 2,5 | 666,19 £ | 760.120,40 £ | **4,45%** |
+| **3** | **Uspavani kupci** | 1.352 | 23,10% | 288,7 | 3,8 | 1.375,00 £ | 1.858.990,00 £ | **10,89%** |
+| **4** | **Neaktivni kupci** | 1.621 | 27,70% | 415,6 | 1,2 | 261,31 £ | 423.577,30 £ | **2,48%** |
+
+#### Opis svakog klastera u jednoj rečenici za direktora prodaje:
+
+1. **VIP kupci (Klaster 0):**
+   > *„Naša elitna grupa od 454 najveća veleprodajna kupca koji naručuju na svake dve do tri nedelje (prosečno 33 porudžbine) i sami donose čak 55% celokupnog prihoda firme.“*
+2. **Lojalni kupci (Klaster 1):**
+   > *„Pouzdani, stalni poslovni partneri koji stabilno kupuju svakih mesec do dva (u proseku 9 porudžbina) i predstavljaju temelj našeg redovnog poslovanja sa udelom od preko 27% prihoda.“*
+3. **Povremeni kupci (Klaster 2):**
+   > *„Nedavno aktivirani ili manji kupci koji su naručivali u proteklih mesec dana sa manjim probnim korpama (prosečno 2 do 3 porudžbine i 666 £) i koje ciljanim akcijama treba prevesti u redovne kupce.“*
+4. **Uspavani kupci (Klaster 3):**
+   > *„Značajni bivši kupci koji su istorijski ostvarili po 4 porudžbine i preko 1.300 £ prometa, ali nisu kupili ništa već 9 do 10 meseci i nalaze se u ozbiljnom riziku od trajnog odlaska.“*
+5. **Neaktivni kupci (Klaster 4):**
+   > *„Jednokratni kupci male vrednosti (u proseku 261 £) koji su se javili samo jednom pre više od 14 meseci i na koje ne treba trošiti skupe prodajne resurse.“*
+
+
+## 4. Poređenje sa RFM segmentacijom iz Dana 3 (Zadatak 4.4 / Pitanja 4.3 & 4.4)
+
+### Pitanje 4.3: Da li se K-Means i RFM segmenti poklapaju? Gde se najviše razilaze?
+
+#### 1. Matrica preklapanja segmenata (`pd.crosstab`)
+Tabela ukrštanja pravila RFM segmentacije iz Dana 3 i K-Means klastera iz Dana 4:
+
+| RFM segment (Dan 3) | VIP kupci | Lojalni kupci | Povremeni kupci | Uspavani kupci | Neaktivni kupci | Ukupno |
+|---|---|---|---|---|---|---|
+| **Champions** | **362** | **392** | 76 | 0 | 0 | 830 |
+| **Loyal Customers** | 86 | **805** | 258 | 2 | 0 | 1.151 |
+| **Potential Loyalists** | 0 | 51 | **661** | 1 | 0 | 713 |
+| **New Customers** | 0 | 1 | **57** | 0 | 0 | 58 |
+| **Promising** | 0 | 45 | **89** | 0 | 0 | 134 |
+| **Need Attention** | 0 | **189** | 17 | 0 | 0 | 206 |
+| **Cannot Lose Them** | 5 | 33 | 0 | **34** | 0 | 72 |
+| **At Risk** | 0 | 0 | 0 | **652** | 102 | 754 |
+| **Asleep** | 0 | 0 | 0 | **412** | 22 | 434 |
+| **Lost** | 0 | 0 | 0 | 205 | **1.295** | 1.500 |
+| **Ukupno** | **454** | **1.284** | **1.141** | **1.352** | **1.621** | **5.852** |
+
+#### 2. Gde se segmenti poklapaju:
+- **Na ekstremima ponašanja:**
+  - Postoji izuzetno visoko slaganje kod izgubljenih i neaktivnih kupaca: čak 1.295 od 1.500 `Lost` kupaca iz RFM-a K-Means svrstava direktno u `Neaktivne kupce`, a preostalih 205 u `Uspavane kupce`. Nijedan `Lost` kupac nije zalutao u aktivne klastere.
+  - Slično, segment `Champions` je skoro u potpunosti podeljen između `VIP kupaca` (362) i `Lojalnih kupaca` (392).
+  - Segmenti `Potential Loyalists` i `New Customers` se velikom većinom slivaju u `Povremene kupce` (661, odnosno 57).
+
+#### 3. Gde se segmenti najviše razilaze:
+- **Razdvajanje vrha baze (`Champions` vs. `VIP kupci`):** 
+  Pravila RFM-a su u `Champions` stavila 830 kupaca na osnovu fiksnih kvintila ($R \ge 4, F \ge 4, M \ge 4$). Međutim, K-Means je prepoznao da ova grupa nije homogena: iz nje je izdvojio apsolutni vrh piramide — 454 kupca (`VIP kupci`) sa prosečnom potrošnjom od 20.635 £, dok je preostale spojio sa grupom stabilnih redovnih kupaca (`Lojalni kupci`, prosek 3.627 £).
+- **Prelazne i rizične kategorije (`At Risk`, `Cannot Lose Them`, `Need Attention`):** 
+  Fiksne granice kvintila u RFM-u stvaraju veštačke preseke (kupac sa ocenom 2,9 i kupac sa ocenom 3,1 mogu završiti u potpuno različitim segmentima). K-Means ih grupiše na osnovu kontinuiranog rastojanja:
+  - Kupci iz `At Risk` su podeljeni između `Uspavanih` (652 kupca sa solidnom prethodnom istorijom) i `Neaktivnih` (102 kupca sa skromnijom istorijom).
+  - Segment `Cannot Lose Them` (72 kupca) podeljen je na one koji su zaista duboko uspavani (34 kupca u `Uspavani`) i one čija visoka frekvencija i potrošnja još uvek gravitiraju ka aktivnim jezgrima (`Lojalni` sa 33 i `VIP` sa 5 kupaca).
+
+
+### Pitanje 4.4: Koji pristup biste koristili u praksi i za šta? Navedite po jednu prednost svakog.
+
+#### 1. Preporučena arhitektura u praksi: Dvoslojna segmentacija
+U realnom poslovnom okruženju ova dva pristupa nisu isključivi konkurenti, već komplementarni slojevi analitičkog sistema:
+
+```
++---------------------------------------------------------------------------------------+
+| STRATEŠKI NIVO: K-Means klasterizacija (Kvartalno / Polugodišnje ažuriranje)         |
+| Korisnici: Rukovodstvo prodaje, finansije, strateški marketing, operativno planiranje |
+| Svrha: Zdravlje portfolija kupaca, planiranje budžeta, dodela nivoa podrške (SLA)    |
++---------------------------------------------------------------------------------------+
+                                           |
+                                           v
++---------------------------------------------------------------------------------------+
+| OPERATIVNI NIVO: RFM segmentacija na bazi pravila (Dnevni / Nedeljni automatski batch)|
+| Korisnici: CRM tim, marketing automatizacija (HubSpot, Braze, Klaviyo), prodavci      |
+| Svrha: Automatizovani email tokovi, triger kampanje, dodela popusta i vaučera        |
++---------------------------------------------------------------------------------------+
+```
+
+#### 2. Namena u praksi i ključna prednost za oba pristupa:
+
+| Pristup | Primena u praksi | Glavna prednost |
+|---|---|---|
+| **RFM segmentacija (pravila)** | **Dnevne CRM i marketinške kampanje:** Okidanje automatizovanih imejl poruka dobrodošlice, reaktivacionih sekvenci, dodela personalizovanih kupona i postavljanje dnevnih zadataka prodajnom timu na osnovu jednostavnih pragova. | **Potpuna transparentnost i intuitivnost:** Svakom članu tima (marketing, prodaja, menadžment) je trenutno jasno zašto se kupac nalazi u određenom segmentu. Pravila se mogu odmah prilagoditi u CRM-u bez ponovnog treniranja algoritama i rizika od pomeranja centara. |
+| **K-Means klasterizacija** | **Strateško planiranje i alokacija budžeta:** Definisanje komercijalnih paketa usluga (npr. dodela namenskog komercijaliste samo za 454 VIP kupca), optimizacija skladišnih zaliha i identifikacija prirodnih grupa kupaca bez nametnutih arbitrarnih granica. | **Otkrivanje prirodnih grupacija u podacima bez veštačkih podela:** Algoritam uvažava zajedničku višedimenzionalnu gustinu podataka umesto veštačkih 20-procentnih kvintila, otkrivajući realne obrasce ponašanja koji prevazilaze krute tablične matrice. |
+
