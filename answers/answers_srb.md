@@ -374,3 +374,186 @@ U realnom poslovnom okruženju ova dva pristupa nisu isključivi konkurenti, ve�
 | **RFM segmentacija (pravila)** | **Dnevne CRM i marketinške kampanje:** Okidanje automatizovanih imejl poruka dobrodošlice, reaktivacionih sekvenci, dodela personalizovanih kupona i postavljanje dnevnih zadataka prodajnom timu na osnovu jednostavnih pragova. | **Potpuna transparentnost i intuitivnost:** Svakom članu tima (marketing, prodaja, menadžment) je trenutno jasno zašto se kupac nalazi u određenom segmentu. Pravila se mogu odmah prilagoditi u CRM-u bez ponovnog treniranja algoritama i rizika od pomeranja centara. |
 | **K-Means klasterizacija** | **Strateško planiranje i alokacija budžeta:** Definisanje komercijalnih paketa usluga (npr. dodela namenskog komercijaliste samo za 454 VIP kupca), optimizacija skladišnih zaliha i identifikacija prirodnih grupa kupaca bez nametnutih arbitrarnih granica. | **Otkrivanje prirodnih grupacija u podacima bez veštačkih podela:** Algoritam uvažava zajedničku višedimenzionalnu gustinu podataka umesto veštačkih 20-procentnih kvintila, otkrivajući realne obrasce ponašanja koji prevazilaze krute tablične matrice. |
 
+---
+
+# Odgovori na pitanja za Dan 5 — Predikcija: Da li će se kupac vratiti?
+
+Odgovori u nastavku su izvedeni direktno iz programskog koda, izlaznih rezultata izvršavanja i modela mašinskog učenja u [05_predict.ipynb](notebooks/05_predict.ipynb) i prateće projektne dokumentacije.
+
+
+## 1. Namerna greška i curenje podataka (Zadatak 5.1)
+
+### Pitanje za Zadatak 5.1: Zašto je rezultat naivnog modela (Tačnost > 0,98, ROC AUC > 0,999) potpuno bezvredan?
+
+U Zadatku 5.1 namerno je napravljena klasična početnička greška:
+- Vrednost `Recency` je izračunata na celokupnom skupu podataka: `Recency = (maksimalni_datum + 1 dan - poslednji_datum).days`.
+- Ciljna promenljiva je definisana pravilom: `Cilj = 1 ako je Recency <= 30, inače 0`.
+- Logistička regresija je obučena koristeći osobine `[Recency, Frequency, Monetary]` da predvidi `Cilj`.
+- Rezultati evaluacije: **Tačnost = 0,9801 (98,01%)**, **ROC AUC = 0,9998 (~1,0000)**.
+
+#### Zašto je ovaj rezultat potpuno bezvredan:
+1. **Direktna matematička tautologija (samo-ispunjujući cilj):**
+   Ciljna varijabla `Cilj` je eksplicitno definisana kao matematički prag nad ulaznom osobinom `Recency` ($Recency \le 30$). Davanjem osobine `Recency` modelu kao prediktora, model ne uči zakonitosti ponašanja kupaca, već uči običnu trivijalnu matematičku nejednakost ($x \le 30 \implies y = 1$).
+2. **Vremensko curenje podataka (korišćenje nepoznate budućnosti):**
+   U ovakvoj postavci, `Recency` uzima u obzir sve transakcije do poslednjeg sekunda u bazi. Kada bi se ovakav model primenio u praksi danas, mi ne možemo znati recency kupca za 30 dana u budućnosti dok to vreme zapravo ne prođe. Korišćenje budućnosti za predviđanje sadašnjosti daje lažno savršene rezultate na istorijskim podacima, ali je u produkciji neprimenljivo.
+
+
+## 2. Ispravna postavka sa vremenskim presekom i kreiranje osobina (Zadaci 5.2 i 5.3)
+
+### 1. Arhitektura vremenske podele podataka (Time-based Cutoff)
+Kako bi se u potpunosti eliminisalo curenje podataka iz budućnosti, vremenska linija je strogo podeljena na dva prozora:
+
+```
+|------------------- PROZOR POSMATRANJA (PROŠLOST) ---------------|--- PROZOR CILJA (BUDUĆNOST) ---|
+           Osobine se računaju ISKLJUČIVO odavde                  ↑       Ovde merimo CILJ
+                                                             DATUM PRESEKA
+                                                              2011-09-10
+                                                      (Maksimalni datum − 90 dana)
+```
+
+- **Maksimalni datum u podacima:** `2011-12-09 12:50:00`
+- **Datum preseka (Maksimalni datum − 90 dana):** `2011-09-10`
+- **Broj transakcija iz prošlosti (prozor posmatranja):** 618.316 transakcija (79,6% podataka)
+- **Broj transakcija iz budućnosti (prozor cilja):** 158.263 transakcije (20,4% podataka)
+- **Kupci uključeni u modelovanje:** 5.256 jedinstvenih kupaca koji su bili aktivni pre datuma preseka
+- **Definicija cilja (`Goal`):** Da li je kupac napravio barem jednu porudžbinu u narednih 90 dana nakon preseka:
+  - **Klasa 1 (Vratili se):** 2.289 kupaca (**43,55% ~ 43,6%**)
+  - **Klasa 0 (Nisu se vratili):** 2.967 kupaca (**56,45% ~ 56,4%**)
+
+### 2. Kreirane osobine (izračunate isključivo iz prošlosti pre preseka)
+Kreirano je ukupno 13 ponašajnih osobina po kupcu na osnovu istorijskih podataka:
+1. `Recency`: Broj dana od poslednje kupovine pre preseka do datuma preseka.
+2. `Frequency`: Broj jedinstvenih faktura (porudžbina) pre preseka.
+3. `Monetary`: Ukupna potrošnja (£) pre preseka.
+4. `NumberOfItems`: Ukupan broj kupljenih stavki (redova u fakturama) pre preseka.
+5. `DistinctProducts`: Broj različitih artikala (`StockCode`) koje je kupac naručio pre preseka.
+6. `AverageQuantity`: Prosečna količina naručena po stavci pre preseka.
+7. `AveragePrice`: Prosečna jedinična cena (£) kupljenih artikala pre preseka.
+8. `AverageCart`: Prosečna vrednost korpe po porudžbini (`Monetary / Frequency`).
+9. `CustomerTenure`: Starost poslovnog odnosa u danima (`Datum preseka - Prva kupovina`).
+10. `AverageDaysBetweenPurchases`: Prosečan razmak između porudžbina (`CustomerTenure / (Frequency - 1)`).
+11. `IsUK`: Binarni indikator da li je kupac iz Velike Britanije.
+12. `OrdersLast90Days`: Broj faktura realizovanih u poslednjih 90 dana neposredno pre preseka (`[Presek - 90d, Presek]`).
+13. `SpendingLast90Days`: Ukupna potrošnja (£) realizovana u poslednjih 90 dana neposredno pre preseka.
+
+
+## 3. Obuka, evaluacija i poređenje modela (Zadatak 5.4)
+
+### 1. Eksperimentalna postavka
+- **Podela na Train/Test:** 75% Trening (3.942 kupca) / 25% Test (1.314 kupaca), sa očuvanom proporcijom klasa (`stratify=Goal`).
+- **Distribucija u test setu:** 742 Klasa 0 (56,47%) / 572 Klasa 1 (43,53%).
+- **Evaluacija tri modela:**
+  1. `DummyClassifier(strategy="most_frequent")` — Osnovna linija (većinska klasa).
+  2. `LogisticRegression(class_weight="balanced", max_iter=2000)` — Linearni model unutar `Pipeline`-a sa `StandardScaler`-om.
+  3. `RandomForestClassifier(n_estimators=300, max_depth=12, min_samples_leaf=20, class_weight="balanced")` — Nelinearni ansambl stabala.
+
+### 2. Tabela uporedne evaluacije (Test skup, $N = 1.314$)
+
+| Model | Tačnost (Accuracy) | Preciznost (Precision) | Odziv (Recall) | F1 ocena | ROC AUC |
+|---|---|---|---|---|---|
+| **Osnovna linija (Baseline)** | 0,5647 (56,5%) | 0,0000 | 0,0000 | 0,0000 | 0,5000 |
+| **Logistička regresija** | 0,7314 (73,1%) | 0,6918 (69,2%) | 0,6906 (69,1%) | 0,6912 (69,1%) | 0,7949 (~0,795) |
+| **Random Forest** | **0,7435 (74,4%)** | **0,7205 (72,0%)** | **0,6713 (67,1%)** | **0,6950 (69,5%)** | **0,8047 (~0,805)** |
+
+### 3. Matrice konfuzije (Test skup, $N = 1.314$)
+
+```
+Osnovna linija (Baseline):
+[[742    0]   --> TN = 742, FP = 0
+ [572    0]]  --> FN = 572, TP = 0
+
+Logistička regresija:
+[[566  176]   --> TN = 566, FP = 176 (Lažne uzbune)
+ [177  395]]  --> FN = 177 (Propušteni kupci), TP = 395 (Pogođeni povratnici)
+
+Random Forest:
+[[593  149]   --> TN = 593, FP = 149 (Lažne uzbune)
+ [188  384]]  --> FN = 188 (Propušteni kupci), TP = 384 (Pogođeni povratnici)
+```
+
+
+## 4. Tumačenje modela i značajnost osobina (Zadatak 5.5)
+
+### 1. Značajnost osobina (Feature Importance kod Random Forest-a)
+Random Forest je identifikovao svežinu kupovine i ritam naručivanja kao ključne faktore za predviđanje povratka:
+
+| Rang | Osobina (Feature) | Relativni značaj | Poslovno tumačenje |
+|---|---|---|---|
+| **1** | `Recency` | **0,2052 (20,5%)** | Dominantni prediktor: svežina nedavne aktivnosti je presudna. |
+| **2** | `AverageDaysBetweenPurchases` | **0,1546 (15,5%)** | Ritam naručivanja: kupci sa redovnim ciklusom pouzdano ponavljaju kupovinu. |
+| **3** | `NumberOfItems` | **0,1029 (10,3%)** | Ukupan obim i dubina prethodne aktivnosti. |
+| **4** | `SpendingLast90Days` | **0,0899 (9,0%)** | Finansijska posvećenost kupca neposredno pre preseka. |
+| **5** | `Frequency` | **0,0898 (9,0%)** | Ukupan istorijski broj realizovanih porudžbina. |
+| **6** | `Monetary` | **0,0890 (8,9%)** | Ukupan istorijski prihod ostvaren od kupca. |
+| **7** | `OrdersLast90Days` | **0,0629 (6,3%)** | Intenzitet i zalet porudžbina u prethodna tri meseca. |
+| **8** | `DistinctProducts` | **0,0597 (6,0%)** | Širina asortimana: kupci koji istražuju katalog imaju veći stepen zadržavanja. |
+| **9** | `AverageCart` | **0,0401 (4,0%)** | Prosečna vrednost korpe. |
+| **10** | `CustomerTenure` | **0,0396 (4,0%)** | Dužina trajanja poslovnog odnosa. |
+| **11** | `AveragePrice` | **0,0338 (3,4%)** | Prosečna jedinična cena artikala. |
+| **12** | `AverageQuantity` | **0,0321 (3,2%)** | Količina robe po naručenoj stavci. |
+| **13** | `IsUK` | **0,0003 (0,03%)** | Geografska lokacija kupca ima zanemarljiv uticaj na verovatnoću povratka. |
+
+### 2. Standardizovani koeficijenti Logističke regresije
+Koeficijenti pokazuju smer i jačinu uticaja na verovatnoću (log-odds) ponovne kupovine:
+- **Pozitivni pokretači (povećavaju verovatnoću povratka):**
+  - `DistinctProducts` (+0,5684): Raznovrsnost asortimana stvara vezanost za dobavljača i lojalnost.
+  - `OrdersLast90Days` (+0,4792): Zalet kupovina neposredno pre preseka je direktan indikator kontinuiteta.
+  - `Frequency` (+0,3393): Veliki broj prethodnih kupovina potvrđuje stalnog partnera.
+  - `SpendingLast90Days` (+0,1912): Svež finansijski obrt.
+  - `CustomerTenure` (+0,1178): Stabilni dugogodišnji kupci imaju uspostavljene navike naručivanja.
+- **Negativni pokretači (smanjuju verovatnoću povratka):**
+  - `AveragePrice` (-0,5587): Visoka pojedinačna cena često oslikava vanredne ili jednokratne narudžbine sa niskom učestalošću.
+  - `Recency` (-0,5393): Sa povećanjem broja dana od poslednje kupovine eksponencijalno opada šansa za povratak.
+  - `NumberOfItems` (-0,4109) i `AverageDaysBetweenPurchases` (-0,2949): Veliki razmaci između narudžbina prirodno smanjuju verovatnoću da kupac ponovo kupi u fiksnom prozoru od 90 dana.
+
+
+## 5. Odgovori na pitanja za notebook
+
+### Pitanje 5.1: Objasnite svojim rečima šta je curenje podataka i kako ste ga izbegli.
+1. **Šta je curenje podataka (Data Leakage):**
+   Curenje podataka predstavlja situaciju u kojoj informacije van trening skupa — konkretno iz same ciljne promenljive, iz budućih vremenskih tačaka ili iz test skupa — nehotice dospeju u osobine (features) na kojima model uči. Model tada „vara“: umesto da prepoznaje realne uzročno-posledične obrasce ponašanja, on uči prečice bazirane na podacima koji u realnom vremenu produkcije nisu i ne mogu biti dostupni. Posledica je lažno savršen rezultat na razvoju (poput AUC 0,9998 u Zadatku 5.1) koji se u produkciji momentalno raspada.
+2. **Kako smo ga izbegli:**
+   - **Stroga vremenska granica (Time-based Cutoff):** Definisali smo datum preseka (`2011-09-10`, 90 dana pre kraja skupa). Sve osobine izračunate su **isključivo** iz transakcija zaključenih na dan preseka ili pre njega.
+   - **Nezavisan prozor za merenje cilja:** Ciljna promenljiva (`Goal`) merena je **isključivo** na osnovu događaja koji su se desili *posle* datuma preseka.
+   - **Pipeline obrada bez curenja:** Standardizacija podataka (`StandardScaler`) je fitovana isključivo na trening skupu unutar `Pipeline`-a, sprečavajući da test statistika kontaminira proces učenja.
+
+### Pitanje 5.2: Osnovna linija ima tačnost 56,5%, vaš model ~74%. Da li je model dobar? Zašto tačnost ovde nije dovoljna mera?
+1. **Da li je model dobar?**
+   Da, model je izuzetno dobar. Skok sa 56,5% na **74,4% tačnosti**, uz stabilan **ROC AUC od 0,805** i balansiranu preciznost (72,0%) i odziv (67,1%), predstavlja jak i visoko profitabilan prediktivni signal u realnom poslovanju predviđanja odlaska/povratka kupaca. Model uspeva da tačno identifikuje preko dve trećine svih kupaca koji će se vratiti, zadržavajući visoku pouzdanost predikcije.
+2. **Zašto tačnost nije dovoljna mera:**
+   - **Neuravnoteženost klasa i trivijalna osnovna linija:** U test skupu 56,5% kupaca se nije vratilo. Naivni model koji jednostavno pretpostavi da se *niko nikada neće vratiti* postiže tačnost od 56,5%, ali ima nulti odziv, nultu preciznost i apsolutno nikakvu upotrebnu vrednost za biznis.
+   - **Asimetrija poslovnih troškova:** Tačnost posmatra obe greške (lažnu uzbunu i propuštenog kupca) kao jednako loše (vrednujući ih sa greškom 1). U stvarnom biznisu, gubitak vrednog kupca košta hiljade funti, dok je slanje jedne suvišne marketinške poruke zanemarljiv trošak.
+   - **Zavisnost od fiksnog praga (0,5):** Tačnost meri performanse samo na jednoj proizvoljnoj tački preseka verovatnoće. Metrike poput ROC AUC (0,805) ocenjuju sposobnost modela da rangira kupce kroz sve moguće poslovne pragove.
+
+### Pitanje 5.3: Objasnite matricu konfuzije rečima: šta je „lažna uzbuna“, a šta „propušten kupac“? Koja greška je skuplja za firmu i zašto?
+1. **Značenje polja u matrici konfuzije (Test skup, Random Forest):**
+   - **Lažna uzbuna (False Positive, $FP = 149$):** Model je predvideo da će se kupac vratiti, ali se on zapravo *nije vratio* (ostao je neaktivan).
+   - **Propušten kupac (False Negative, $FN = 188$):** Model je predvideo da se kupac neće vratiti, ali je on zapravo *došao i kupio* (ili je napustio firmu a da ga sistem nije prepoznao za spasavanje).
+   - **Tačno identifikovani povratnici (True Positive, $TP = 384$):** Kupci za koje je model pogodio da se vraćaju.
+   - **Tačno identifikovani neaktivni (True Negative, $TN = 593$):** Kupci za koje je model pogodio da neće kupiti.
+2. **Koja greška je skuplja za firmu i zašto:**
+   Trošak direktno zavisi od poslovne primene modela:
+   - **U programima zadržavanja i sprečavanja odlaska (Retention / Churn):** **Propušten kupac (False Negative) je neuporedivo skuplja greška.** Ako ne prepoznamo kupca koji odlazi i ne preduzmemo prodajnu akciju, trajno gubimo njegovu celokupnu životnu vrednost (CLV) koja u B2B veleprodaji dostiže desetine hiljada funti. Lažna uzbuna nas košta samo utrošenog poziva ili poslatog vaučera.
+   - **U kampanjama skupih direktnih poklona:** Ukoliko firma svakom predviđenom kupcu šalje skup fizički paket ili skup komercijalni poklon (npr. vrednosti 50–100 €), tada **Lažna uzbuna (False Positive)** stvara direktan čist gubitak budžeta na neaktivnim nalozima.
+   - Generalno, u upravljanju odnosima sa kupcima **False Negative je 5 do 10 puta skuplja greška**, jer je cena akvizicije novog kupca (CAC) znatno veća od troškova zadržavanja postojećeg.
+
+### Pitanje 5.4: `Recency` je najvažnija osobina. Da li je to isto curenje podataka kao u 5.1? Obrazložite — ovo je suština celog dana.
+**Ne, to fundamentalno NIJE isto curenje podataka!** Ovo razgraničenje predstavlja ključnu suštinu prediktivnog modelovanja vremenskih serija:
+- **U Zadatku 5.1 (Curenje):** `Recency` je izračunat nad *celokupnom bazom* (uključujući i budući prozor), a cilj je definisan bukvalno kao $Recency \le 30$. Osobina je sadržala direktno rešenje cilja — model je učio kružnu definiciju nad istim vremenskim podacima.
+- **U Zadatku 5.2/5.3 (Validan prediktivni signal):** `Recency` je izračunat strogo iz transakcija u prošlosti *u odnosu na istorijski datum preseka* (`Presek - Poslednja kupovina pre preseka`). On meri koliko je dana prošlo od kupovine pre preseka. Ciljna promenljiva meri da li je kupac kupio nešto u *budućih 90 dana nakon preseka*.
+- Prošli recency je legitiman signal ponašanja: kupac koji je naručio robu pre 4 dana ima prirodno daleko veći zalet i šansu da ponovo naruči u narednih 90 dana nego kupac koji nije naručio ništa punih 300 dana. Ovde se poštuje smer vremena: istorijsko ponašanje iz prošlosti predviđa buduće događaje preko nepropusne vremenske granice.
+
+### Pitanje 5.5: Firma šalje kupon od 5 evra kupcima za koje model kaže da će se vratiti. Da li biste podigli ili spustili prag odlučivanja sa 0,5? Šta vam još treba da biste odgovorili tačno?
+1. **Odluka o pomeranju praga odlučivanja:**
+   - **Ekonomska dilema:** Slanje kupona kupcima koji imaju izuzetno visoku verovatnoću povratka (npr. $p > 0,85$) znači davanje čistog popusta i smanjenje sopstvene profitne marže za kupovinu koja bi se svakako desila („kanibalizacija profita“). S druge strane, slanje kupona kupcima sa izuzetno malom verovatnoćom ($p < 0,2$) troši budžet na naloge koji kupon nikada neće iskoristiti.
+   - Ukoliko je strateški zadatak striktno nagraditi one koji će se sigurno vratiti uz minimalno rasipanje budžeta na lažne uzbune, prag odlučivanja treba **podići (npr. na 0,65 ili 0,70)**. Time se podiže preciznost (Precision) i kupon se daje samo onima u čiju je kupovinu model visoko siguran.
+   - *Moderna marketinška praksa (Uplift modelovanje):* Kupon od 5 € donosi najveći povrat ako se ne šalje ni sigurnim povratnicima ni trajno izgubljenima, već onima na prelazu („kupci koje je moguće ubediti“, npr. verovatnoća $p \in [0,35, 0,60]$), gde podsticaj stvara stvarni dodatni prihod.
+2. **Dodatne informacije neophodne za tačan matematički odgovor:**
+   Da bismo analitički optimizovali prag $p^*$ koji maksimizuje ukupan profit firme, neophodni su sledeći finansijski i operativni parametri:
+   1. **Prosečna vrednost narudžbine (AOV) i profitna marža ($M$):** Koliki je stvarni neto profit (u evrima) koji firma ostvari od jedne realizovane narudžbine?
+   2. **Inkrementalni efekat kupona (Uplift, $L$):** Koliki procenat kupaca kupuje *isključivo zahvaljujući* kuponu od 5 € u odnosu na kontrolnu grupu kojoj kupon nije poslat?
+   3. **Stopa kanibalizacije marže:** Koji udeo povratnika bi naručio po punoj ceni i bez ponuđenog popusta od 5 €?
+   4. **Trošak kampanje ($C$):** Troškovi slanja i obrade vaučera (SMS, imejl, štampa) uvećani za nominalnu vrednost popusta od 5 €.
+   Definisanjem matrice dobitaka i gubitaka: $\mathbb{E}[\text{Profit}(p)] = \sum (\text{Dodatni profit} - \text{Troškovi})$, proračunava se tačan optimalni prag $p^*$ koji maksimizuje ukupan neto profit preduzeća.
+
+
