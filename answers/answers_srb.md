@@ -556,4 +556,109 @@ Koeficijenti pokazuju smer i jačinu uticaja na verovatnoću (log-odds) ponovne 
    4. **Trošak kampanje ($C$):** Troškovi slanja i obrade vaučera (SMS, imejl, štampa) uvećani za nominalnu vrednost popusta od 5 €.
    Definisanjem matrice dobitaka i gubitaka: $\mathbb{E}[\text{Profit}(p)] = \sum (\text{Dodatni profit} - \text{Troškovi})$, proračunava se tačan optimalni prag $p^*$ koji maksimizuje ukupan neto profit preduzeća.
 
+---
+
+# Odgovori na pitanja za Dan 6 — Opcija C: Sistem preporuka (Market Basket analiza)
+
+Odgovori u nastavku su izvedeni direktno iz programskog koda, izlaznih rezultata analize potrošačke korpe i pravila pridruživanja u [06_recommendation.ipynb](notebooks/06_recommendation.ipynb) i prateće projektne dokumentacije.
+
+
+## 1. Postavka sistema i dimenziona optimizacija
+
+### 1. Kombinatorni izazov i rešenje
+- **Problem sa celim asortimanom:** Celokupan katalog broji **4.620 različitih artikala (`StockCode`)**. Matrica svih mogućih neusmerenih parova sadrži $\binom{4620}{2} = \frac{4620 \times 4619}{2} \approx \mathbf{10.669.890}$ kombinacija (odnosno preko **21,3 miliona** usmerenih pravila pridruživanja). Ogromna većina tih parova predstavlja slučajne jednokratne kupovine artikala koji su se prodali tek nekoliko puta, što nema statističku stabilnost i stvara nepotrebno računarsko opterećenje.
+- **Optimizacija na 300 najčešćih artikala:** Ograničavanjem na top **300 najfrekventnijih artikala** (po broju jedinstvenih faktura):
+  - **Pokriveni računi:** **33.081 faktura** sadrži barem jedan od 300 najpopularnijih artikala.
+  - **Udeo u bazi:** Ovim podskupom pokriveno je čak **90,4% svih jedinstvenih računa (36.594)** u posmatranom periodu poslovanja.
+  - **Generisani parovi:** Iz korpi sa više artikala izračunata su **44.834 jedinstvena para proizvoda**.
+
+### 2. Metrike analize potrošačke korpe (Market Basket Analysis)
+Za svaki par artikala $A$ i $B$ proračunate su tri klasične metrike pravila pridruživanja:
+1. **Podrška (Support, $A \land B$):** Udeo računa koji sadrže oba artikla u odnosu na ukupan broj kvalifikovanih računa ($N = 33.081$):
+   $$\text{Support}(A \land B) = \frac{\text{Broj faktura}(A \land B)}{N}$$
+2. **Pouzdanost (Confidence, $A \to B$):** Uslovna verovatnoća da će račun sadržati artikal $B$ ukoliko je na njemu već prisutan artikal $A$:
+   $$\text{Confidence}(A \to B) = \frac{\text{Broj faktura}(A \land B)}{\text{Broj faktura}(A)}$$
+3. **Lift ($A, B$):** Odnos stvarne zajedničke pojave i teorijski očekivane zajedničke pojave pod pretpostavkom statističke nezavisnosti:
+   $$\text{Lift}(A, B) = \frac{\text{Support}(A \land B)}{\text{Support}(A) \times \text{Support}(B)} = \frac{\text{Confidence}(A \to B)}{\text{Support}(B)}$$
+   - $\text{Lift} > 1$: Pozitivna povezanost (artikli se kupuju zajedno znatno češće nego što bi se desilo slučajno).
+   - $\text{Lift} = 1$: Nezavisnost (nema međusobnog uticaja u korpi).
+   - $\text{Lift} < 1$: Supstitutivni odnos (kupovina artikla $A$ smanjuje verovatnoću kupovine artikla $B$).
+
+### 3. Provera kontrolnih tačaka
+- **Broj parova sa Lift > 1:** **37.740 parova** od ukupno 44.834 (**84,2%** generisanih parova ima stvarnu pozitivnu vezu).
+- **Maksimalni ostvareni Lift:** **37,64** (između odgovarajućih papirnih čaša i papirnih tanjira).
+
+
+## 2. Najjače asocijacije proizvoda (Top parovi po Lift-u)
+
+Tabela 15 najjačih asocijativnih veza među proizvodima rangiranih po koeficijentu Lift:
+
+| Artikal A | Artikal B | Zajedno (računa) | Conf (A $\to$ B) | Conf (B $\to$ A) | Lift |
+|---|---|---|---|---|---|
+| **SET/6 RED SPOTTY PAPER CUPS** | **SET/6 RED SPOTTY PAPER PLATES** | 489 | **78,74%** | **70,66%** | **37,64** |
+| **SET/10 PINK POLKADOT PARTY CANDLES** | **SET/10 BLUE SPOTTY PARTY CANDLES** | 480 | 64,95% | **80,13%** | **35,87** |
+| **FELTCRAFT PRINCESS CHARLOTTE DOLL** | **FELTCRAFT PRINCESS LOLA DOLL** | 379 | 61,03% | 63,48% | **33,82** |
+| **RED STRIPE CERAMIC DRAWER KNOB** | **BLUE STRIPE CERAMIC DRAWER KNOB** | 400 | 65,15% | 62,60% | **33,73** |
+| **WOODEN HEART CHRISTMAS SCANDINAVIAN**| **WOODEN STAR CHRISTMAS SCANDINAVIAN** | 469 | 64,51% | 70,63% | **32,14** |
+| **FELTCRAFT CUSHION BUTTERFLY** | **FELTCRAFT CUSHION RABBIT** | 445 | 65,54% | 65,73% | **32,02** |
+| **GARDENERS KNEELING PAD CUP OF TEA** | **GARDENERS KNEELING PAD KEEP CALM** | 463 | 72,91% | 61,24% | **31,91** |
+| **GREEN REGENCY TEACUP AND SAUCER** | **PINK REGENCY TEACUP AND SAUCER** | 635 | 67,12% | **84,11%** | **29,41** |
+| **WHITE SPOT RED CERAMIC DRAWER KNOB** | **RED STRIPE CERAMIC DRAWER KNOB** | 340 | 55,37% | 54,40% | **29,31** |
+| **PINK HAPPY BIRTHDAY BUNTING** | **BLUE HAPPY BIRTHDAY BUNTING** | 437 | 69,04% | 53,95% | **28,19** |
+| **BATHROOM METAL SIGN** | **TOILET METAL SIGN** | 554 | 59,76% | 76,10% | **27,16** |
+| **FELTCRAFT CUSHION OWL** | **FELTCRAFT CUSHION RABBIT** | 415 | 53,83% | 61,30% | **26,30** |
+| **EDWARDIAN PARASOL BLACK** | **EDWARDIAN PARASOL RED** | 386 | 48,98% | 62,06% | **26,05** |
+| **RED RETROSPOT UMBRELLA** | **BLACK RECORD COVER FRAME** | 399 | 62,34% | 50,25% | **25,97** |
+| **SET/10 PINK POLKADOT PARTY CANDLES** | **SET/10 BLUE SPOTTY PARTY CANDLES** | 364 | 46,19% | 60,77% | **25,51** |
+
+
+## 3. Implementacija funkcije `recommend(stock_code)`
+
+Funkcija `recommend(item_code, top_n=5)` pretražuje asocijativna pravila u oba smera ($A \to B$ i $B \to A$), spaja rezultate i sortira preporučene artikle opadajuće po vrednostima **Lift** i **Confidence**:
+
+### Primer rada na artiklu `22699` (ROSES REGENCY TEACUP AND SAUCER)
+```
+=== RECOMMENDATIONS FOR ITEM: ROSES REGENCY TEACUP AND SAUCER (22699) ===
+  Recommended_Code                  Recommended_Name  Common  Confidence    Lift
+0            22698    PINK REGENCY TEACUP AND SAUCER     605       0.565  24.774
+1            22697   GREEN REGENCY TEACUP AND SAUCER     754       0.705  24.642
+2            23245        SET OF 3 REGENCY CAKE TINS     133       0.124   5.727
+3            22423          REGENCY CAKESTAND 3 TIER     588       0.550   5.481
+4            22907  PACK OF 20 NAPKINS PANTRY DESIGN      89       0.083   4.076
+```
+Sistem preporuka nepogrešivo rekonstruiše celokupan viktorijanski set za čaj: sestrinske Pink i Green šoljice ($Lift \approx 25$), prateće kutije za kolače ($Lift = 5,73$) i glavno komercijalno sidro asortimana `REGENCY CAKESTAND 3 TIER` ($Lift = 5,48$, kupljeno zajedno na čak 588 računa).
+
+
+## 4. Odgovori na pitanja za Dan 6 Opcija C
+
+### Pitanje 6.C.1: Pogledajte najjače parove — šta im je zajedničko?
+Svi najjači parovi sa ekstremnim Lift vrednostima ($\text{Lift} \in [25, 38]$) dele jasne zajedničke karakteristike:
+1. **Funkcionalni komplementi iz iste dizajnerske linije:**
+   Čaše i tanjiri identičnog tufnastog dezena za rođendane (`SET/6 RED SPOTTY PAPER CUPS` + `PLATES`, Lift = 37,64).
+2. **Varijacije iste linije u različitim bojama ili motivima:**
+   - Roze i plave svećice za proslave (`SET/10 PINK POLKADOT` + `BLUE SPOTTY CANDLES`, Lift = 35,87) ili rođendanske zastavice (Pink + Blue Bunting, Lift = 28,19).
+   - Keramičke ručice za fioke u različitim prugama (Red stripe + Blue stripe, Lift = 33,73).
+3. **Tematske praznične ili dekorativne kolekcije:**
+   - Skandinavski drveni božićni ukrasi (Wooden Heart + Wooden Star, Lift = 32,14).
+   - Dečije lutke i jastuci iz linije „Feltcraft“ (Lutke Charlotte + Lola, Lift = 33,82; Jastuci Leptir + Zec, Lift = 32,02).
+   - Parovi tablica sa natpisima za enterijer (`BATHROOM` + `TOILET METAL SIGN`, Lift = 27,16).
+
+### Pitanje 6.C.2: Šta vam to otkriva o tome kako kupci kupuju?
+Ovi obrasci otkrivaju komercijalnu logiku veleprodajnih B2B kupaca i vlasnika maloprodaja:
+- **Kupovina celovitih kolekcija:** Trgovci ne kupuju pojedinačne nasumične artikle. Da bi im maloprodajne police i izlozi bili atraktivni krajnjim potrošačima, oni poručuju **tematski zaokružene komplete** (npr. ceo party asortiman čaša, tanjira i svećica, ili metalne table za kupatilo i toalet u paru).
+- **Dubina asortimana (kupovina više boja):** Veleprodajni kupac naručuje istovremeno roze i plavu varijantu istog proizvoda kako bi u svojoj radnji ponudio izbor za oba pola.
+- **Sinergija unakrsne prodaje (Cross-selling):** Kada kupac planira događaj ili tematsko opremanje, odluka o kupovini čaša automatski povlači potrebu za tanjirima i salvetama istog dezena, stvarajući ogroman potencijal za preporučivanje paketa proizvoda.
+
+### Pitanje 6.C.3: Koje je glavno ograničenje ovakvog sistema?
+Iako su pravila pridruživanja jednostavna i intuitivna, sistem ima četiri ključna strukturna ograničenja:
+1. **Problem hladnog starta (Cold-Start Problem za nove proizvode):**
+   Sistem se u potpunosti oslanja na istorijske zajedničke kupovine. Novi artikli tek uvršteni u katalog ili retki artikli sa malo kupovina **nikada ne mogu biti preporučeni** niti se za njih mogu naći pravila.
+2. **Očigledne i banalne preporuke (nedostatak faktora iznenađenja / Serendipity):**
+   Sistem dominantno predlaže alternativne boje ili očigledne supstitute (npr. „Kupili ste zelenu šoljicu, evo vam i roze šoljica“). Ne uspeva da otkrije suptilne veze između različitih kategorija koje kupac sam ne bi primetio (npr. da kupci zidnih satova često kupuju specifične mirisne sveće).
+3. **Potpuno odsustvo personalizacije prema kupcu:**
+   Preporuke zavise isključivo od posmatranog artikla, a ne od kupca koji ga gleda. Svaki kupac (bio on VIP distributer ili jednokratni kupac poklona) dobija identičnu listu preporuka za dati artikal, bez obzira na istorijat njegovih prethodnih narudžbina ili budžet.
+4. **Kombinatorna eksplozija i skalabilnost:**
+   Računanje veza za više od dva artikla istovremeno ($A \land B \to C$) eksponencijalno uvećava broj kombinacija. Na katalogu od nekoliko desetina hiljada artikala rad sa matricama ko-pojavljivanja zahteva specijalizovane algoritme (Apriori ili FP-Growth) uz rigorozno filtriranje.
+
+
 

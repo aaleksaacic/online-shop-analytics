@@ -556,4 +556,109 @@ Standardized coefficients indicate directional impact on the log-odds of a custo
    4. **Delivery & Fulfillment Cost ($C$):** The cost of delivering the communication (email, SMS, direct mail) plus the €5 face value.
    With these inputs, the expected profit function $\mathbb{E}[\Pi(p)] = \sum (\text{Revenue Lift} - \text{Campaign Costs})$ can be optimized to select the exact optimal threshold $p^*$.
 
+---
+
+# Day 6 Question Answers — Option C: Recommender System (Market Basket Analysis)
+
+The answers below are derived directly from the code, execution outputs, and association rule mining models in [06_recommendation.ipynb](notebooks/06_recommendation.ipynb) and the accompanying assignment documentation.
+
+
+## 1. System Setup and Dimensionality Optimization
+
+### 1. The Combinatorial Challenge & Solution
+- **The Raw Problem:** Across the entire catalog of **4,620 unique products (`StockCode`)**, the complete co-occurrence matrix encompasses $\binom{4620}{2} = \frac{4620 \times 4619}{2} \approx \mathbf{10,669,890}$ unordered pairs (and over **21.3 million** directed association rules). The overwhelming majority of these pairs reflect sparse, random transactions (e.g., two items each bought 2–3 times) that carry zero statistical significance and introduce immense computational overhead.
+- **The Top-300 Optimization:** By filtering the catalog to the top **300 most frequent items** (ranked by unique invoice count):
+  - **Invoices covered:** **33,081 invoices** contain at least one of the top 300 items.
+  - **Dataset Coverage:** This filtered subset captures **90.4% of all 36,594 unique invoices** in the company's two-year history.
+  - **Evaluated Pairs:** Generated **44,834 unique co-occurring item pairs** from multi-item baskets.
+
+### 2. Association Metrics Framework
+For any two products $A$ and $B$, association rules are evaluated using standard Market Basket metrics:
+1. **Support ($A \land B$):** Frequency of invoices containing both items divided by total qualifying invoices ($N = 33,081$):
+   $$\text{Support}(A \land B) = \frac{\text{Count}(A \land B)}{N}$$
+2. **Confidence ($A \to B$):** Conditional probability that an invoice contains $B$ given that it contains $A$:
+   $$\text{Confidence}(A \to B) = \frac{\text{Count}(A \land B)}{\text{Count}(A)}$$
+3. **Lift ($A, B$):** Ratio of observed co-occurrence to expected co-occurrence under statistical independence:
+   $$\text{Lift}(A, B) = \frac{\text{Support}(A \land B)}{\text{Support}(A) \times \text{Support}(B)} = \frac{\text{Confidence}(A \to B)}{\text{Support}(B)}$$
+   - $\text{Lift} > 1$: Strong positive affinity (items are purchased together significantly more often than by chance).
+   - $\text{Lift} = 1$: Independence (no cross-selling relationship).
+   - $\text{Lift} < 1$: Substitutive or cannibalistic relationship (purchasing $A$ decreases likelihood of purchasing $B$).
+
+### 3. Checkpoint Validation
+- **Pairs with Lift > 1:** **37,740 pairs** out of 44,834 (**84.2%** of generated pairs exhibit genuine positive association).
+- **Maximum Lift Achieved:** **37.64** (between matching party paper cups and paper plates).
+
+
+## 2. Strongest Product Associations (Top Pairs by Lift)
+
+The top 15 strongest product affinity pairs mined by the system:
+
+| Item A Name | Item B Name | Co-occurrences (Invoices) | Confidence (A $\to$ B) | Confidence (B $\to$ A) | Lift Coefficient |
+|---|---|---|---|---|---|
+| **SET/6 RED SPOTTY PAPER CUPS** | **SET/6 RED SPOTTY PAPER PLATES** | 489 | **78.74%** | **70.66%** | **37.64** |
+| **SET/10 PINK POLKADOT PARTY CANDLES** | **SET/10 BLUE SPOTTY PARTY CANDLES** | 480 | 64.95% | **80.13%** | **35.87** |
+| **FELTCRAFT PRINCESS CHARLOTTE DOLL** | **FELTCRAFT PRINCESS LOLA DOLL** | 379 | 61.03% | 63.48% | **33.82** |
+| **RED STRIPE CERAMIC DRAWER KNOB** | **BLUE STRIPE CERAMIC DRAWER KNOB** | 400 | 65.15% | 62.60% | **33.73** |
+| **WOODEN HEART CHRISTMAS SCANDINAVIAN**| **WOODEN STAR CHRISTMAS SCANDINAVIAN** | 469 | 64.51% | 70.63% | **32.14** |
+| **FELTCRAFT CUSHION BUTTERFLY** | **FELTCRAFT CUSHION RABBIT** | 445 | 65.54% | 65.73% | **32.02** |
+| **GARDENERS KNEELING PAD CUP OF TEA** | **GARDENERS KNEELING PAD KEEP CALM** | 463 | 72.91% | 61.24% | **31.91** |
+| **GREEN REGENCY TEACUP AND SAUCER** | **PINK REGENCY TEACUP AND SAUCER** | 635 | 67.12% | **84.11%** | **29.41** |
+| **WHITE SPOT RED CERAMIC DRAWER KNOB** | **RED STRIPE CERAMIC DRAWER KNOB** | 340 | 55.37% | 54.40% | **29.31** |
+| **PINK HAPPY BIRTHDAY BUNTING** | **BLUE HAPPY BIRTHDAY BUNTING** | 437 | 69.04% | 53.95% | **28.19** |
+| **BATHROOM METAL SIGN** | **TOILET METAL SIGN** | 554 | 59.76% | 76.10% | **27.16** |
+| **FELTCRAFT CUSHION OWL** | **FELTCRAFT CUSHION RABBIT** | 415 | 53.83% | 61.30% | **26.30** |
+| **EDWARDIAN PARASOL BLACK** | **EDWARDIAN PARASOL RED** | 386 | 48.98% | 62.06% | **26.05** |
+| **RED RETROSPOT UMBRELLA** | **BLACK RECORD COVER FRAME** | 399 | 62.34% | 50.25% | **25.97** |
+| **SET/10 PINK POLKADOT PARTY CANDLES** | **SET/10 BLUE SPOTTY PARTY CANDLES** | 364 | 46.19% | 60.77% | **25.51** |
+
+
+## 3. The `recommend(stock_code)` Implementation
+
+The `recommend(item_code, top_n=5)` function performs bidirectional rule lookups across both $A \to B$ and $B \to A$, sorting recommendations by descending **Lift** and **Confidence**:
+
+### Verification Example: Item `22699` (ROSES REGENCY TEACUP AND SAUCER)
+```
+=== RECOMMENDATIONS FOR ITEM: ROSES REGENCY TEACUP AND SAUCER (22699) ===
+  Recommended_Code                  Recommended_Name  Common  Confidence    Lift
+0            22698    PINK REGENCY TEACUP AND SAUCER     605       0.565  24.774
+1            22697   GREEN REGENCY TEACUP AND SAUCER     754       0.705  24.642
+2            23245        SET OF 3 REGENCY CAKE TINS     133       0.124   5.727
+3            22423          REGENCY CAKESTAND 3 TIER     588       0.550   5.481
+4            22907  PACK OF 20 NAPKINS PANTRY DESIGN      89       0.083   4.076
+```
+The recommender dynamically constructs a complete Victorian Regency tea set: matching Pink and Green cups ($Lift \approx 25$), the matching Regency Cake Tins ($Lift = 5.73$), and the core commercial anchor product `REGENCY CAKESTAND 3 TIER` ($Lift = 5.48$, appearing together on 588 invoices).
+
+
+## 4. Answers to Core Questions for Day 6 Option C
+
+### Question 6.C.1: Inspect the strongest pairs — what do they have in common?
+All top pairs sharing the highest Lift values ($\text{Lift} \in [25, 38]$) exhibit clear structural patterns:
+1. **Direct Functional Complements within a Unified Theme:** 
+   Paper cups paired with paper plates featuring the exact same visual design (`SET/6 RED SPOTTY PAPER CUPS` + `SET/6 RED SPOTTY PAPER PLATES`, Lift = 37.64).
+2. **Colorway & Motif Variations of the Identical SKU:**
+   - Pink vs. Blue colorways of the same party items (`SET/10 PINK POLKADOT PARTY CANDLES` + `SET/10 BLUE SPOTTY PARTY CANDLES`, Lift = 35.87; Pink vs. Blue `HAPPY BIRTHDAY BUNTING`, Lift = 28.19).
+   - Interior ceramic knob finishes (Red stripe vs. Blue stripe ceramic drawer knobs, Lift = 33.73).
+3. **Thematic Seasonal or Decorative Collections:**
+   - Scandinavian Christmas wooden ornaments (Wooden Heart + Wooden Star, Lift = 32.14).
+   - "Feltcraft" character toys and cushions (Princess Charlotte + Princess Lola dolls, Lift = 33.82; Butterfly + Rabbit cushions, Lift = 32.02).
+   - Domestic metal signage sets (`BATHROOM METAL SIGN` + `TOILET METAL SIGN`, Lift = 27.16).
+
+### Question 6.C.2: What does this reveal about customer shopping patterns?
+This pattern reveals the distinct purchasing psychology of wholesale B2B buyers and commercial retailers:
+- **Merchandise Collection Buying:** Retail shopkeepers do not purchase standalone items. To make their store shelves attractive to retail end-consumers, they purchase **complete themed collections** (e.g., matching cups, plates, and candles for party displays, or both Bathroom and Toilet signs).
+- **Assortment Depth (Color/Style Multipacking):** Commercial buyers order multiple color variations of the same product line simultaneously (such as Pink and Blue birthday items, or Pink, Green, and Rose Regency teacups) to offer choice to their retail customers.
+- **Cross-Selling Synergy:** When a customer decides to buy an event item (like a paper cup), their intent is not merely to own cups; their intent is to host a coordinated event. This creates massive cross-selling pull across all matching tabletop accessories.
+
+### Question 6.C.3: What is the primary limitation of this recommender approach (Association Rules / Market Basket Analysis)?
+While Association Rules (Market Basket Analysis) provide transparent, interpretable affinities, they suffer from four critical structural limitations:
+1. **The Cold-Start Problem (New Items):** 
+   Association rules depend strictly on historical co-occurrence frequencies. Newly introduced products, seasonal catalog additions, or low-volume items have zero or few transactions and can **never** be recommended or used as a query item.
+2. **Trivial and Obvious Recommendations (Lack of Serendipity):**
+   The algorithm frequently recommends trivial substitutes or near-identical color variations (e.g., "You bought a pink teacup, here is a green teacup"). It struggles to discover subtle, non-obvious cross-category affinities (e.g., discovering that buyers of vintage clocks also buy artisanal tea canisters).
+3. **Total Absence of Customer Personalization:**
+   Recommendations are static and item-centric. Every single customer viewing the `RED SPOTTY PAPER CUPS` receives the exact same recommendation (`RED SPOTTY PAPER PLATES`), regardless of whether they are a VIP wholesale distributor or a one-time occasion buyer, and regardless of what they purchased in previous orders.
+4. **Combinatorial Explosion & Memory Bottleneck:**
+   Evaluating combinations beyond pairs ($A \land B \to C$) scales exponentially ($O(M^k)$). Full-catalog mining across 4,600+ items without strict pre-filtering quickly exhausts memory and requires specialized pruning algorithms (Apriori or FP-Growth).
+
+
 
